@@ -60,3 +60,18 @@
 2025-07-24 08:30:50,836 - INFO - Creating emergency fallback files...
 2025-07-24 08:30:50,837 - INFO - Data saved to CSV: csv/smm_silver_prices_20250724.csv
 2025-07-24 08:30:50,837 - INFO - ✅ Emergency fallback CSV created
+2025-07-24 08:37:52,320 - INFO - Starting SMM Silver Scraper
+2025-07-24 08:37:52,320 - INFO - ====== WebDriver manager ======
+2025-07-24 08:37:57,191 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 08:37:57,281 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 08:37:57,352 - INFO - There is no [linux64] chromedriver "138.0.7204.168" for browser google-chrome "138.0.7204" in cache
+2025-07-24 08:37:57,352 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 08:37:57,531 - INFO - WebDriver version 138.0.7204.168 selected
+2025-07-24 08:37:57,534 - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/linux64/chromedriver-linux64.zip
+2025-07-24 08:37:57,534 - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/linux64/chromedriver-linux64.zip
+2025-07-24 08:37:57,642 - INFO - Driver downloading response is 200
+2025-07-24 08:37:57,905 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 08:37:58,087 - INFO - Driver has been saved in cache [/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168]
+2025-07-24 08:37:58,089 - ERROR - Scraping failed: [Errno 8] Exec format error: '/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168/chromedriver-linux64/THIRD_PARTY_NOTICES.chromedriver'
+2025-07-24 08:37:58,089 - INFO - Data saved to CSV: csv/smm_silver_prices_20250724.csv
+2025-07-24 08:37:58,089 - INFO - Emergency CSV created
