@@ -46,16 +46,47 @@ jobs:
         
     - name: Run scraper
       run: |
+        echo "🚀 Starting scraper..."
         python main_scraper.py
+        echo "✅ Scraper execution completed"
         
     - name: List generated files
       run: |
-        echo "CSV files:"
-        ls -la csv/ || echo "No CSV files generated"
-        echo "Screenshot files:"
-        ls -la screenshots/ || echo "No screenshot files generated"
-        echo "Log files:"
-        ls -la logs/ || echo "No log files generated"
+        echo "📁 Current directory contents:"
+        ls -la
+        echo ""
+        echo "📊 CSV files:"
+        find csv/ -type f -name "*.csv" 2>/dev/null && ls -la csv/ || echo "No CSV files found"
+        echo ""
+        echo "📸 Screenshot files:"
+        find screenshots/ -type f \( -name "*.png" -o -name "*.jpg" \) 2>/dev/null && ls -la screenshots/ || echo "No screenshot files found"
+        echo ""
+        echo "📝 Log files:"
+        find logs/ -type f -name "*.log" 2>/dev/null && ls -la logs/ || echo "No log files found"
+        echo ""
+        echo "🔍 Checking if files were created:"
+        echo "CSV count: $(find csv/ -type f -name "*.csv" 2>/dev/null | wc -l)"
+        echo "Screenshot count: $(find screenshots/ -type f \( -name "*.png" -o -name "*.jpg" \) 2>/dev/null | wc -l)"
+        echo "Log count: $(find logs/ -type f -name "*.log" 2>/dev/null | wc -l)"
+        
+    - name: Create dummy files if none exist (for artifact upload)
+      run: |
+        # Create dummy files if directories are empty to avoid upload warnings
+        if [ ! "$(ls -A csv/)" ]; then
+          echo "timestamp,date,rate,raw_date,scrape_time" > csv/no_data_generated.csv
+          echo "$(date '+%Y-%m-%d %H:%M:%S'),$(date '+%Y-%m-%d'),0,No data,$(date '+%H:%M:%S')" >> csv/no_data_generated.csv
+          echo "📝 Created dummy CSV file"
+        fi
+        
+        if [ ! "$(ls -A screenshots/)" ]; then
+          echo "No screenshots were generated during this run" > screenshots/no_screenshots.txt
+          echo "📝 Created placeholder for screenshots"
+        fi
+        
+        if [ ! "$(ls -A logs/)" ]; then
+          echo "No log files were generated" > logs/no_logs.txt
+          echo "📝 Created placeholder for logs"
+        fi
         
     - name: Upload CSV files
       uses: actions/upload-artifact@v4
