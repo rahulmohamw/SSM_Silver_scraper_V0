@@ -3,7 +3,7 @@ name: SMM Silver Price Scraper
 on:
   schedule:
     # Run daily at 10:00 AM UTC (adjust timezone as needed)
-    - cron: '0 10 * * *'
+    - cron: '30 4 * * *'
   workflow_dispatch: # Allow manual trigger
   push:
     branches: [main]
