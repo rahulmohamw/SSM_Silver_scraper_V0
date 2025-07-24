@@ -159,34 +159,66 @@ class SMMSilverScraper:
     
     def take_screenshot(self, driver, data):
         """Take screenshot of the page"""
+        logger.info("🔄 Starting screenshot process...")
+        
         try:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             screenshot_path = os.path.join(self.screenshot_folder, f'smm_silver_{timestamp}.png')
             
-            # Force create directory with proper permissions
-            os.makedirs(self.screenshot_folder, mode=0o755, exist_ok=True)
+            # Debug: Check current working directory
+            logger.info(f"📁 Current working directory: {os.getcwd()}")
+            logger.info(f"📸 Screenshot target path: {screenshot_path}")
             
-            # Wait for page to fully render
+            # Force create directory
+            os.makedirs(self.screenshot_folder, mode=0o777, exist_ok=True)
+            logger.info(f"📂 Directory created/verified: {self.screenshot_folder}")
+            
+            # Debug: List directory contents before
+            if os.path.exists(self.screenshot_folder):
+                files_before = os.listdir(self.screenshot_folder)
+                logger.info(f"📋 Files in screenshots/ before: {files_before}")
+            
+            # Wait and get page info
             time.sleep(5)
+            logger.info(f"🌐 Page size: {driver.get_window_size()}")
+            logger.info(f"📄 Page ready state: {driver.execute_script('return document.readyState')}")
             
-            # Get screenshot as binary data
+            # Try screenshot
+            logger.info("📸 Attempting screenshot...")
             screenshot_png = driver.get_screenshot_as_png()
+            logger.info(f"📊 Screenshot data size: {len(screenshot_png)} bytes")
             
-            # Write directly to file
+            # Write file
+            logger.info(f"💾 Writing to: {screenshot_path}")
             with open(screenshot_path, 'wb') as f:
                 f.write(screenshot_png)
             
-            # Verify file was created
+            # Verify and debug
             if os.path.exists(screenshot_path):
                 size = os.path.getsize(screenshot_path)
-                logger.info(f"✅ Screenshot saved: {screenshot_path} ({size} bytes)")
+                logger.info(f"✅ Screenshot file created: {size} bytes")
+                
+                # List directory contents after
+                files_after = os.listdir(self.screenshot_folder)
+                logger.info(f"📋 Files in screenshots/ after: {files_after}")
+                
                 return screenshot_path
             else:
-                logger.error("❌ Screenshot file not created")
+                logger.error("❌ Screenshot file does not exist after write")
                 return None
                 
         except Exception as e:
-            logger.error(f"❌ Screenshot failed: {e}")
+            logger.error(f"❌ Screenshot exception: {type(e).__name__}: {str(e)}")
+            
+            # Try creating a dummy file to test file system
+            try:
+                dummy_path = os.path.join(self.screenshot_folder, f'test_{timestamp}.txt')
+                with open(dummy_path, 'w') as f:
+                    f.write("Test file creation")
+                logger.info(f"✅ Dummy file created successfully: {dummy_path}")
+            except Exception as dummy_e:
+                logger.error(f"❌ Even dummy file creation failed: {dummy_e}")
+            
             return None
     
     def save_to_csv(self, data):
