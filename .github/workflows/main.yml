@@ -1,513 +1,140 @@
-#!/usr/bin/env python3
-"""
-SMM Silver Price Scraper
-Scrapes silver price data from metal.com and saves to CSV with screenshots
-"""
+name: SMM Silver Price Scraper
 
-import os
-import csv
-import time
-import logging
-from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-import pandas as pd
+on:
+  schedule:
+    # Run daily at 10:00 AM UTC (adjust timezone as needed)
+    - cron: '0 10 * * *'
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [main]
+    paths: ['**.py', '**.yml']
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/scraper.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+    - name: Create directories
+      run: |
+        mkdir -p csv screenshots logs
+        
+    - name: Run scraper
+      run: |
+        echo "🚀 Starting scraper..."
+        python main_scraper.py
+        echo "✅ Scraper execution completed"
+        
+    - name: List generated files
+      run: |
+        echo "📁 Current directory contents:"
+        ls -la
+        echo ""
+        echo "📊 CSV files:"
+        find csv/ -type f -name "*.csv" 2>/dev/null && ls -la csv/ || echo "No CSV files found"
+        echo ""
+        echo "📸 Screenshot files:"
+        find screenshots/ -type f \( -name "*.png" -o -name "*.jpg" \) 2>/dev/null && ls -la screenshots/ || echo "No screenshot files found"
+        echo ""
+        echo "📝 Log files:"
+        find logs/ -type f -name "*.log" 2>/dev/null && ls -la logs/ || echo "No log files found"
+        echo ""
+        echo "🔍 Checking if files were created:"
+        echo "CSV count: $(find csv/ -type f -name "*.csv" 2>/dev/null | wc -l)"
+        echo "Screenshot count: $(find screenshots/ -type f \( -name "*.png" -o -name "*.jpg" \) 2>/dev/null | wc -l)"
+        echo "Log count: $(find logs/ -type f -name "*.log" 2>/dev/null | wc -l)"
+        
+    - name: Create dummy files if none exist (for artifact upload)
+      run: |
+        # Create dummy files if directories are empty to avoid upload warnings
+        if [ ! "$(ls -A csv/)" ]; then
+          echo "timestamp,date,rate,raw_date,scrape_time" > csv/no_data_generated.csv
+          echo "$(date '+%Y-%m-%d %H:%M:%S'),$(date '+%Y-%m-%d'),0,No data,$(date '+%H:%M:%S')" >> csv/no_data_generated.csv
+          echo "📝 Created dummy CSV file"
+        fi
+        
+        if [ ! "$(ls -A screenshots/)" ]; then
+          echo "No screenshots were generated during this run" > screenshots/no_screenshots.txt
+          echo "📝 Created placeholder for screenshots"
+        fi
+        
+        if [ ! "$(ls -A logs/)" ]; then
+          echo "No log files were generated" > logs/no_logs.txt
+          echo "📝 Created placeholder for logs"
+        fi
+        
+    - name: Upload CSV files
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: csv-data-${{ github.run_number }}
+        path: csv/
+        retention-days: 90
+        
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: screenshots-${{ github.run_number }}
+        path: screenshots/
+        retention-days: 30
+        
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: logs-${{ github.run_number }}
+        path: logs/
+        retention-days: 7
+        
+    - name: Commit and push data (optional)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add csv/ screenshots/ logs/ || true
+        git diff --staged --quiet || git commit -m "Update scraper data - $(date '+%Y-%m-%d %H:%M:%S')"
+        git push || echo "Nothing to push"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-class SMMSilverScraper:
-    def __init__(self):
-        # Updated URL based on actual SMM structure
-        self.url = "https://www.metal.com/silver/201102250392"
-        self.csv_folder = "csv"
-        self.screenshot_folder = "screenshots"
-        self.ensure_directories()
-        
-    def ensure_directories(self):
-        """Create necessary directories if they don't exist"""
-        for folder in [self.csv_folder, self.screenshot_folder, 'logs']:
-            os.makedirs(folder, exist_ok=True)
-            logger.info(f"Directory ensured: {folder}")
-            
-    def setup_driver(self):
-        """Setup Chrome WebDriver with options"""
-        chrome_options = Options()
-        chrome_options.add_argument('--headless')  # Always headless in CI
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-extensions')
-        chrome_options.add_argument('--disable-logging')
-        chrome_options.add_argument('--disable-web-security')
-        chrome_options.add_argument('--allow-running-insecure-content')
-        chrome_options.add_argument('--ignore-certificate-errors')
-        chrome_options.add_argument('--ignore-ssl-errors-on-localhost')
-        chrome_options.add_argument('--ignore-certificate-errors-spki-list')
-        chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-        chrome_options.add_argument('--window-size=1920,1080')
-        chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        
-        # Additional options for better stability
-        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-        
-        try:
-            # Install ChromeDriver automatically
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            logger.info("Chrome WebDriver initialized successfully")
-            
-            # Set page load timeout
-            driver.set_page_load_timeout(30)
-            driver.implicitly_wait(10)
-            
-            return driver
-        except Exception as e:
-            logger.error(f"Failed to initialize Chrome WebDriver: {e}")
-            raise
-        
-    def extract_data(self, driver):
-        """Extract date and price data from the page"""
-        try:
-            # Wait for page to load completely
-            wait = WebDriverWait(driver, 30)
-            time.sleep(5)  # Additional wait for dynamic content
-            
-            logger.info("Page loaded, extracting data...")
-            logger.info(f"Page title: {driver.title}")
-            logger.info(f"Page URL: {driver.current_url}")
-            
-            # Get page source for debugging
-            page_source = driver.page_source
-            logger.info(f"Page source length: {len(page_source)}")
-            
-            # Save page source for debugging
-            with open('logs/page_source.html', 'w', encoding='utf-8') as f:
-                f.write(page_source)
-            
-            # Try multiple approaches to find the data
-            date_found = None
-            price_found = None
-            
-            # Method 1: Look for specific price patterns in page source
-            import re
-            
-            # Look for CNY/kg prices (based on your original screenshot showing 9,351 CNY/kg)
-            cny_patterns = [
-                r'(\d{1,2}[,\s]*\d{3})\s*CNY[/\s]*kg',  # 9,351 CNY/kg or 9 351 CNY/kg
-                r'(\d{4,5})\s*CNY[/\s]*kg',              # 9351 CNY/kg
-                r'(\d{1,2}[,\.]\d{3})\s*CNY',            # 9,351 CNY or 9.351 CNY
-                r'>(\d{1,2}[,\s]*\d{3})<.*?CNY',         # HTML: >9,351< ... CNY
-                r'(\d{4,5})\s*</.*?CNY',                 # 9351</div>CNY
-            ]
-            
-            for pattern in cny_patterns:
-                matches = re.findall(pattern, page_source, re.IGNORECASE)
-                if matches:
-                    price_found = matches[0].replace(',', '').replace(' ', '')
-                    logger.info(f"Found CNY price with pattern '{pattern}': {price_found}")
-                    break
-            
-            # Method 2: Look for USD/kg prices and convert (fallback)
-            if not price_found:
-                usd_patterns = [
-                    r'(\d{1,4}[,\.]?\d{0,3})\s*USD[/\s]*kg',  # USD/kg prices
-                    r'(\d{3,4})\s*USD',                        # Generic USD prices
-                ]
-                
-                for pattern in usd_patterns:
-                    matches = re.findall(pattern, page_source, re.IGNORECASE)
-                    if matches:
-                        usd_price = matches[0].replace(',', '').replace(' ', '')
-                        try:
-                            # Convert USD to CNY (approximate rate 1 USD = 7.2 CNY)
-                            price_found = str(int(float(usd_price) * 7.2))
-                            logger.info(f"Found USD price '{usd_price}', converted to CNY: {price_found}")
-                            break
-                        except:
-                            continue
-            
-            # Method 3: Look for any large numbers that could be prices
-            if not price_found:
-                large_numbers = re.findall(r'\b(\d{4,5})\b', page_source)
-                # Filter for reasonable silver price ranges (8000-12000 CNY/kg)
-                for num in large_numbers:
-                    if 7000 <= int(num) <= 15000:
-                        price_found = num
-                        logger.info(f"Found potential price from large numbers: {price_found}")
-                        break
-            
-            # Method 4: Try DOM element extraction
-            if not price_found:
-                logger.info("Trying DOM element extraction...")
-                try:
-                    # Look for elements containing numbers and currency
-                    price_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'CNY') or contains(text(), 'USD') or contains(text(), ',')]")
-                    for elem in price_elements[:20]:  # Check first 20 matches
-                        text = elem.text.strip()
-                        if re.search(r'\d{4,5}', text):  # Contains 4-5 digits
-                            numbers = re.findall(r'\d{1,3}[,\s]*\d{3}|\d{4,5}', text)
-                            for num in numbers:
-                                clean_num = num.replace(',', '').replace(' ', '')
-                                if 7000 <= int(clean_num) <= 15000:
-                                    price_found = clean_num
-                                    logger.info(f"Found price via DOM: {price_found}")
-                                    break
-                        if price_found:
-                            break
-                except Exception as e:
-                    logger.warning(f"DOM extraction failed: {e}")
-            
-            # Extract date patterns
-            date_patterns = [
-                r'Jul\s+24,?\s+2025',
-                r'Jul\s+\d{1,2},?\s+2025',
-                r'(\d{1,2}\s+Jul\s+2025)',
-                r'(Jul\s+\d{1,2})',
-                r'2025-07-\d{2}',
-                r'\d{2}/07/2025',
-                r'Mar\s+\d{1,2},?\s+2025',  # Based on search results showing Mar dates
-                r'(\d{1,2}\s+Mar\s+2025)',
-            ]
-            
-            for pattern in date_patterns:
-                match = re.search(pattern, page_source, re.IGNORECASE)
-                if match:
-                    date_found = match.group(1) if match.groups() else match.group()
-                    logger.info(f"Found date with pattern '{pattern}': {date_found}")
-                    break
-            
-            # Fallback date - use current date
-            if not date_found:
-                date_found = datetime.now().strftime('%b %d, %Y')
-                logger.warning(f"Using current date as fallback: {date_found}")
-            
-            # Fallback price - use a reasonable default
-            if not price_found:
-                price_found = "8478"  # Based on search results showing current silver prices
-                logger.warning(f"Using fallback price: {price_found}")
-            
-            # Parse date to Python-friendly format
-            parsed_date = self.parse_date(date_found)
-            
-            # Ensure price is numeric and reasonable
-            try:
-                price_numeric = int(price_found.replace(',', '').replace(' ', ''))
-                if price_numeric < 1000 or price_numeric > 20000:
-                    raise ValueError("Price out of reasonable range")
-                price_found = str(price_numeric)
-            except:
-                price_found = "8478"  # Emergency fallback
-                logger.warning("Using emergency fallback price")
-            
-            result = {
-                'date': parsed_date,
-                'rate': price_found,
-                'raw_date': date_found
-            }
-            
-            logger.info(f"Final extracted data: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error extracting data: {str(e)}")
-            # Return emergency fallback data
-            return {
-                'date': datetime.now().strftime('%Y-%m-%d'),
-                'rate': '8478',
-                'raw_date': 'Fallback date'
-            }
+  notify:
+    needs: scrape
+    runs-on: ubuntu-latest
+    if: always()
     
-    def extract_fallback_data(self, driver):
-        """Fallback method to extract data from page source"""
-        try:
-            page_source = driver.page_source
-            import re
-            
-            # Look for date patterns
-            date_patterns = [
-                r'Jul\s+\d+,\s+2025',
-                r'\d{4}-\d{2}-\d{2}',
-                r'\d{2}/\d{2}/2025'
-            ]
-            
-            found_date = None
-            for pattern in date_patterns:
-                match = re.search(pattern, page_source)
-                if match:
-                    found_date = match.group()
-                    break
-            
-            # Look for price patterns
-            price_patterns = [
-                r'(\d{1,3}(?:,\d{3})*)\s*CNY/kg',
-                r'(\d+,\d+)\s*CNY',
-                r'>(\d{1,3}(?:,\d{3})*)<.*?CNY'
-            ]
-            
-            found_price = None
-            for pattern in price_patterns:
-                matches = re.findall(pattern, page_source)
-                if matches:
-                    found_price = matches[0].replace(',', '') if isinstance(matches[0], str) else str(matches[0]).replace(',', '')
-                    break
-            
-            parsed_date = self.parse_date(found_date) if found_date else datetime.now().strftime('%Y-%m-%d')
-            
-            logger.info(f"Fallback extraction - Date: {found_date}, Price: {found_price}")
-            
-            return {
-                'date': parsed_date,
-                'rate': found_price,
-                'raw_date': found_date
-            }
-            
-        except Exception as e:
-            logger.error(f"Fallback extraction failed: {str(e)}")
-            return {
-                'date': datetime.now().strftime('%Y-%m-%d'),
-                'rate': None,
-                'raw_date': 'Error'
-            }
-    
-    def parse_date(self, date_text):
-        """Parse various date formats to YYYY-MM-DD format"""
-        if not date_text:
-            return datetime.now().strftime('%Y-%m-%d')
-            
-        try:
-            # Handle "Jul 24, 2025" format
-            if ',' in date_text and any(month in date_text for month in ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']):
-                parsed = datetime.strptime(date_text, '%b %d, %Y')
-                return parsed.strftime('%Y-%m-%d')
-            
-            # Handle other common formats
-            date_formats = [
-                '%Y-%m-%d',
-                '%d/%m/%Y',
-                '%m/%d/%Y',
-                '%d-%m-%Y',
-                '%B %d, %Y'
-            ]
-            
-            for fmt in date_formats:
-                try:
-                    parsed = datetime.strptime(date_text, fmt)
-                    return parsed.strftime('%Y-%m-%d')
-                except ValueError:
-                    continue
-                    
-        except Exception as e:
-            logger.error(f"Date parsing error: {str(e)}")
-            
-        return datetime.now().strftime('%Y-%m-%d')
-    
-    def take_screenshot(self, driver, data):
-        """Take screenshot of the page highlighting the data"""
-        try:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            screenshot_path = os.path.join(self.screenshot_folder, f'smm_silver_{timestamp}.png')
-            
-            # Ensure the screenshot directory exists
-            os.makedirs(self.screenshot_folder, exist_ok=True)
-            
-            # Set window size for better screenshot
-            driver.set_window_size(1920, 1080)
-            time.sleep(2)  # Wait for resize
-            
-            # Try to scroll to find price data
-            try:
-                # Scroll down to load any dynamic content
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-                time.sleep(2)
-                driver.execute_script("window.scrollTo(0, 0);")
-                time.sleep(2)
-            except:
-                pass
-            
-            # Take full page screenshot
-            success = driver.save_screenshot(screenshot_path)
-            
-            if success and os.path.exists(screenshot_path):
-                logger.info(f"Screenshot saved successfully: {screenshot_path}")
-                logger.info(f"Screenshot file size: {os.path.getsize(screenshot_path)} bytes")
-                return screenshot_path
-            else:
-                logger.error("Screenshot save failed - file not created")
-                return None
-            
-        except Exception as e:
-            logger.error(f"Screenshot error: {str(e)}")
-            
-            # Try alternative screenshot method
-            try:
-                import base64
-                screenshot_b64 = driver.get_screenshot_as_base64()
-                
-                import base64
-                screenshot_data = base64.b64decode(screenshot_b64)
-                
-                with open(screenshot_path, 'wb') as f:
-                    f.write(screenshot_data)
-                
-                logger.info(f"Alternative screenshot method succeeded: {screenshot_path}")
-                return screenshot_path
-                
-            except Exception as e2:
-                logger.error(f"Alternative screenshot method also failed: {str(e2)}")
-                return None
-    
-    def save_to_csv(self, data):
-        """Save extracted data to CSV file"""
-        try:
-            timestamp = datetime.now().strftime('%Y%m%d')
-            csv_path = os.path.join(self.csv_folder, f'smm_silver_prices_{timestamp}.csv')
-            
-            # Check if file exists to determine if we need headers
-            file_exists = os.path.exists(csv_path)
-            
-            with open(csv_path, 'a', newline='', encoding='utf-8') as file:
-                fieldnames = ['timestamp', 'date', 'rate', 'raw_date', 'scrape_time']
-                writer = csv.DictWriter(file, fieldnames=fieldnames)
-                
-                if not file_exists:
-                    writer.writeheader()
-                
-                # Add scrape timestamp
-                data['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                data['scrape_time'] = datetime.now().strftime('%H:%M:%S')
-                
-                writer.writerow(data)
-                logger.info(f"Data saved to CSV: {csv_path}")
-                
-            return csv_path
-            
-        except Exception as e:
-            logger.error(f"CSV save error: {str(e)}")
-            return None
-    
-    def run_scraper(self):
-        """Main method to run the scraper"""
-        logger.info("Starting SMM Silver Price Scraper")
-        logger.info(f"Target URL: {self.url}")
-        driver = None
-        
-        try:
-            # Setup WebDriver
-            logger.info("Initializing WebDriver...")
-            driver = self.setup_driver()
-            logger.info("WebDriver initialized successfully")
-            
-            # Navigate to the page
-            logger.info(f"Navigating to: {self.url}")
-            driver.get(self.url)
-            
-            # Wait for page to load
-            logger.info("Waiting for page to load...")
-            time.sleep(10)  # Increased wait time for dynamic content
-            
-            # Log page info for debugging
-            logger.info(f"Page title: {driver.title}")
-            logger.info(f"Current URL: {driver.current_url}")
-            logger.info(f"Page ready state: {driver.execute_script('return document.readyState')}")
-            
-            # Check if page loaded successfully
-            if "error" in driver.title.lower() or "not found" in driver.title.lower():
-                logger.warning(f"Page may have failed to load properly. Title: {driver.title}")
-            
-            # Extract data
-            logger.info("Extracting data...")
-            data = self.extract_data(driver)
-            logger.info(f"Extracted data: {data}")
-            
-            # Take screenshot (always attempt this)
-            logger.info("Taking screenshot...")
-            screenshot_path = self.take_screenshot(driver, data)
-            if screenshot_path:
-                logger.info(f"Screenshot saved to: {screenshot_path}")
-            else:
-                logger.warning("Screenshot was not saved")
-            
-            # Save to CSV (always attempt this)
-            logger.info("Saving to CSV...")
-            csv_path = self.save_to_csv(data)
-            if csv_path:
-                logger.info(f"CSV saved to: {csv_path}")
-            else:
-                logger.warning("CSV was not saved")
-            
-            # Validate results
-            if data['rate'] and data['rate'] != '0' and int(data['rate']) > 1000:
-                logger.info(f"✅ Successfully extracted - Date: {data['date']}, Rate: {data['rate']} CNY/kg")
-                logger.info("🎉 Scraping completed successfully")
-                return True
-            else:
-                logger.warning(f"⚠️ Extracted data may be incomplete - Rate: {data['rate']}")
-                logger.info("📊 Files were created with available data")
-                return True  # Still return True as we created files
-                
-        except Exception as e:
-            logger.error(f"❌ Scraper error: {str(e)}")
-            logger.error(f"Error type: {type(e).__name__}")
-            
-            # Create emergency fallback files
-            try:
-                logger.info("Creating emergency fallback files...")
-                emergency_data = {
-                    'date': datetime.now().strftime('%Y-%m-%d'),
-                    'rate': '8478',
-                    'raw_date': 'Emergency fallback - check logs'
-                }
-                self.save_to_csv(emergency_data)
-                logger.info("✅ Emergency fallback CSV created")
-                
-                # Try to take a screenshot of error page
-                if driver:
-                    try:
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                        error_screenshot = os.path.join(self.screenshot_folder, f'error_page_{timestamp}.png')
-                        driver.save_screenshot(error_screenshot)
-                        logger.info(f"📸 Error page screenshot saved: {error_screenshot}")
-                    except:
-                        pass
-                        
-                return True  # Return True since we created fallback files
-            except Exception as e2:
-                logger.error(f"Emergency fallback creation failed: {str(e2)}")
-                return False
-            
-        finally:
-            if driver:
-                try:
-                    logger.info("Closing WebDriver...")
-                    driver.quit()
-                    logger.info("✅ WebDriver closed successfully")
-                except Exception as e:
-                    logger.warning(f"Warning during WebDriver cleanup: {str(e)}")
-
-def main():
-    """Main function"""
-    scraper = SMMSilverScraper()
-    success = scraper.run_scraper()
-    
-    if success:
-        print("✅ Scraping completed successfully!")
-    else:
-        print("❌ Scraping failed. Check logs for details.")
-
-if __name__ == "__main__":
-    main()
+    steps:
+    - name: Notify success
+      if: needs.scrape.result == 'success'
+      run: echo "✅ Scraping completed successfully!"
+      
+    - name: Notify failure
+      if: needs.scrape.result == 'failure'
+      run: |
+        echo "❌ Scraping failed!"
+        exit 1
