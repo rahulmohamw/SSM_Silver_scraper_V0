@@ -18,12 +18,12 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
@@ -58,7 +58,7 @@ jobs:
         ls -la logs/ || echo "No log files generated"
         
     - name: Upload CSV files
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: csv-data-${{ github.run_number }}
@@ -66,7 +66,7 @@ jobs:
         retention-days: 90
         
     - name: Upload screenshots
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: screenshots-${{ github.run_number }}
@@ -74,7 +74,7 @@ jobs:
         retention-days: 30
         
     - name: Upload logs
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: logs-${{ github.run_number }}
