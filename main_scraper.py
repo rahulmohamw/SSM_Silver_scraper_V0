@@ -163,57 +163,30 @@ class SMMSilverScraper:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             screenshot_path = os.path.join(self.screenshot_folder, f'smm_silver_{timestamp}.png')
             
-            # Ensure directory exists
-            os.makedirs(self.screenshot_folder, exist_ok=True)
+            # Force create directory with proper permissions
+            os.makedirs(self.screenshot_folder, mode=0o755, exist_ok=True)
             
-            # Set window size and wait
-            driver.set_window_size(1920, 1080)
-            time.sleep(3)
+            # Wait for page to fully render
+            time.sleep(5)
             
-            # Try multiple screenshot methods
-            success = False
+            # Get screenshot as binary data
+            screenshot_png = driver.get_screenshot_as_png()
             
-            # Method 1: Standard screenshot
-            try:
-                success = driver.save_screenshot(screenshot_path)
-                if success and os.path.exists(screenshot_path) and os.path.getsize(screenshot_path) > 0:
-                    logger.info(f"Screenshot saved: {screenshot_path} ({os.path.getsize(screenshot_path)} bytes)")
-                    return screenshot_path
-            except Exception as e:
-                logger.warning(f"Standard screenshot failed: {e}")
+            # Write directly to file
+            with open(screenshot_path, 'wb') as f:
+                f.write(screenshot_png)
             
-            # Method 2: Get screenshot as PNG
-            try:
-                screenshot_png = driver.get_screenshot_as_png()
-                with open(screenshot_path, 'wb') as f:
-                    f.write(screenshot_png)
+            # Verify file was created
+            if os.path.exists(screenshot_path):
+                size = os.path.getsize(screenshot_path)
+                logger.info(f"✅ Screenshot saved: {screenshot_path} ({size} bytes)")
+                return screenshot_path
+            else:
+                logger.error("❌ Screenshot file not created")
+                return None
                 
-                if os.path.exists(screenshot_path) and os.path.getsize(screenshot_path) > 0:
-                    logger.info(f"PNG screenshot saved: {screenshot_path} ({os.path.getsize(screenshot_path)} bytes)")
-                    return screenshot_path
-            except Exception as e:
-                logger.warning(f"PNG screenshot failed: {e}")
-            
-            # Method 3: Base64 screenshot
-            try:
-                import base64
-                screenshot_b64 = driver.get_screenshot_as_base64()
-                screenshot_data = base64.b64decode(screenshot_b64)
-                
-                with open(screenshot_path, 'wb') as f:
-                    f.write(screenshot_data)
-                
-                if os.path.exists(screenshot_path) and os.path.getsize(screenshot_path) > 0:
-                    logger.info(f"Base64 screenshot saved: {screenshot_path} ({os.path.getsize(screenshot_path)} bytes)")
-                    return screenshot_path
-            except Exception as e:
-                logger.warning(f"Base64 screenshot failed: {e}")
-            
-            logger.error("All screenshot methods failed")
-            return None
-            
         except Exception as e:
-            logger.error(f"Screenshot error: {e}")
+            logger.error(f"❌ Screenshot failed: {e}")
             return None
     
     def save_to_csv(self, data):
