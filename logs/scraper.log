@@ -11,3 +11,16 @@
 2025-07-24 06:55:53,929 - INFO - Get LATEST chromedriver version for google-chrome
 2025-07-24 06:55:54,072 - INFO - Driver has been saved in cache [/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168]
 2025-07-24 06:55:54,074 - ERROR - Scraper error: [Errno 8] Exec format error: '/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168/chromedriver-linux64/THIRD_PARTY_NOTICES.chromedriver'
+2025-07-24 07:16:26,481 - INFO - Starting SMM Silver Price Scraper
+2025-07-24 07:16:26,482 - INFO - ====== WebDriver manager ======
+2025-07-24 07:16:27,619 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 07:16:27,721 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 07:16:27,792 - INFO - There is no [linux64] chromedriver "138.0.7204.168" for browser google-chrome "138.0.7204" in cache
+2025-07-24 07:16:27,792 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 07:16:27,969 - INFO - WebDriver version 138.0.7204.168 selected
+2025-07-24 07:16:27,973 - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/linux64/chromedriver-linux64.zip
+2025-07-24 07:16:27,974 - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/linux64/chromedriver-linux64.zip
+2025-07-24 07:16:28,084 - INFO - Driver downloading response is 200
+2025-07-24 07:16:28,358 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-24 07:16:28,539 - INFO - Driver has been saved in cache [/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168]
+2025-07-24 07:16:28,541 - ERROR - Scraper error: [Errno 8] Exec format error: '/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168/chromedriver-linux64/THIRD_PARTY_NOTICES.chromedriver'
