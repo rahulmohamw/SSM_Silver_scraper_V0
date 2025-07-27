@@ -165,3 +165,18 @@
 2025-07-26 04:55:31,316 - ERROR - Scraping failed: [Errno 8] Exec format error: '/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168/chromedriver-linux64/THIRD_PARTY_NOTICES.chromedriver'
 2025-07-26 04:55:31,316 - INFO - Data saved to CSV: csv/smm_silver_prices_20250726.csv
 2025-07-26 04:55:31,316 - INFO - Emergency CSV created
+2025-07-27 04:59:13,267 - INFO - Starting SMM Silver Scraper
+2025-07-27 04:59:13,267 - INFO - ====== WebDriver manager ======
+2025-07-27 04:59:17,924 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-27 04:59:17,963 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-27 04:59:18,001 - INFO - There is no [linux64] chromedriver "138.0.7204.168" for browser google-chrome "138.0.7204" in cache
+2025-07-27 04:59:18,001 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-27 04:59:18,107 - INFO - WebDriver version 138.0.7204.168 selected
+2025-07-27 04:59:18,110 - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/linux64/chromedriver-linux64.zip
+2025-07-27 04:59:18,111 - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/linux64/chromedriver-linux64.zip
+2025-07-27 04:59:18,173 - INFO - Driver downloading response is 200
+2025-07-27 04:59:18,229 - INFO - Get LATEST chromedriver version for google-chrome
+2025-07-27 04:59:18,377 - INFO - Driver has been saved in cache [/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168]
+2025-07-27 04:59:18,379 - ERROR - Scraping failed: [Errno 8] Exec format error: '/home/runner/.wdm/drivers/chromedriver/linux64/138.0.7204.168/chromedriver-linux64/THIRD_PARTY_NOTICES.chromedriver'
+2025-07-27 04:59:18,379 - INFO - Data saved to CSV: csv/smm_silver_prices_20250727.csv
+2025-07-27 04:59:18,380 - INFO - Emergency CSV created
